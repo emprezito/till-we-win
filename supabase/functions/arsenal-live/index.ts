@@ -174,8 +174,46 @@ Deno.serve(async (req) => {
       );
     }
 
-    // --- Step 3: No Arsenal match found ---
-    // Update DB to not live
+    // --- Step 3: Check for RECENTLY FINISHED Arsenal match ---
+    let finishedArsenal = null;
+    const finishedData = await fetchMatches(rapidApiKey, rapidApiHost, { status: "finished", page: "1" });
+    const finishedMatches = finishedData?.matches || [];
+    finishedArsenal = findArsenalMatch(finishedMatches);
+
+    if (!finishedArsenal && finishedData?.pagination?.hasNext) {
+      const totalPages = Math.min(finishedData.pagination.totalPages || 1, 3);
+      for (let p = 2; p <= totalPages && !finishedArsenal; p++) {
+        const pageData = await fetchMatches(rapidApiKey, rapidApiHost, { status: "finished", page: String(p) });
+        finishedArsenal = findArsenalMatch(pageData?.matches || []);
+      }
+    }
+
+    if (finishedArsenal) {
+      const opponent = getOpponent(finishedArsenal);
+      const score = `${finishedArsenal.homeTeamScore ?? "0"}-${finishedArsenal.awayTeamScore ?? "0"}`;
+
+      // Update DB to not live
+      await supabase.from("site_config").update({ is_live: false }).eq(
+        "id",
+        (await supabase.from("site_config").select("id").single()).data?.id
+      );
+
+      return new Response(
+        JSON.stringify({
+          live: false,
+          finished: true,
+          homeTeam: finishedArsenal.home_team_name,
+          awayTeam: finishedArsenal.away_team_name,
+          score,
+          league: finishedArsenal.league_name,
+          opponent,
+          source: "api_finished",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // --- Step 4: No Arsenal match found at all ---
     await supabase.from("site_config").update({ is_live: false }).eq(
       "id",
       (await supabase.from("site_config").select("id").single()).data?.id
@@ -185,6 +223,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         live: false,
         upcoming: false,
+        finished: false,
         source: "api_none",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
