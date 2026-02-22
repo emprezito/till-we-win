@@ -8,6 +8,7 @@ import { Footer } from "@/components/Footer";
 import Index from "./pages/Index";
 import Mission from "./pages/Mission";
 import Live from "./pages/Live";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/mission" element={<Mission />} />
               <Route path="/live" element={<Live />} />
+              <Route path="/admin" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>

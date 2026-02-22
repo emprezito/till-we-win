@@ -1,1 +1,4 @@
 project_id = "wadvyhwbdukdichmkidk"
+
+[functions.fetch-arsenal-fixtures]
+verify_jwt = false
