@@ -11,6 +11,7 @@ export interface StreamServer {
 export interface ArsenalLiveData {
   live: boolean;
   upcoming?: boolean;
+  finished?: boolean;
   homeTeam?: string;
   awayTeam?: string;
   streamUrl?: string;
