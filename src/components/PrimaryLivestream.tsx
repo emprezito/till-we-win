@@ -300,7 +300,52 @@ export function PrimaryLivestream() {
     );
   }
 
-  // STATE 3: No match - Mission Standby
+  // STATE 3: Recently finished match
+  if (data?.finished && data.score) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.2 }}
+        className="overflow-hidden rounded-xl border border-border bg-card"
+      >
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h3 className="font-display text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            Match Complete
+          </h3>
+          <div className="inline-flex items-center gap-2 rounded-full border border-muted-foreground/30 bg-muted px-3 py-1">
+            <span className="font-mono text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              FULL TIME
+            </span>
+          </div>
+        </div>
+        <div className="relative w-full aspect-video bg-secondary flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" />
+          <div className="relative z-10 text-center px-4">
+            <p className="font-mono text-xs sm:text-sm uppercase tracking-widest text-muted-foreground mb-4">
+              Full Time
+            </p>
+            <div className="flex items-center justify-center gap-4 sm:gap-8 mb-3">
+              <p className="font-display text-base sm:text-xl font-bold text-foreground text-right min-w-[100px]">
+                {data.homeTeam}
+              </p>
+              <p className="font-display text-4xl sm:text-6xl font-black text-primary tracking-wider">
+                {data.score}
+              </p>
+              <p className="font-display text-base sm:text-xl font-bold text-foreground text-left min-w-[100px]">
+                {data.awayTeam}
+              </p>
+            </div>
+            {data.league && (
+              <p className="font-mono text-xs text-muted-foreground">{data.league}</p>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // STATE 4: No match - Mission Standby
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
