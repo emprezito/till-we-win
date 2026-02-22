@@ -12,25 +12,26 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Check for manual override in site_config
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { data: config } = await supabase
       .from("site_config")
-      .select("enable_auto_stream, manual_override_stream_url, is_live")
+      .select("enable_auto_stream, manual_override_stream_url, is_live, next_match_date, opponent")
       .limit(1)
       .single();
 
-    // If manual override URL is set, use it
+    // Manual override
     if (config?.manual_override_stream_url) {
       return new Response(
         JSON.stringify({
           live: true,
+          upcoming: false,
           homeTeam: "Arsenal",
-          awayTeam: "Opponent",
+          awayTeam: config.opponent || "Opponent",
           streamUrl: config.manual_override_stream_url,
+          startTime: null,
           league: "Manual Override",
           status: "LIVE",
           source: "manual",
@@ -39,10 +40,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    // If auto stream is disabled, return not live
+    // Auto stream disabled - check for upcoming match from config
     if (!config?.enable_auto_stream) {
+      const hasUpcoming = config?.next_match_date && new Date(config.next_match_date).getTime() > Date.now();
       return new Response(
-        JSON.stringify({ live: false, source: "disabled" }),
+        JSON.stringify({
+          live: false,
+          upcoming: !!hasUpcoming,
+          startTime: hasUpcoming ? config.next_match_date : null,
+          opponent: config?.opponent || "",
+          source: "disabled",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -53,8 +61,16 @@ Deno.serve(async (req) => {
 
     if (!rapidApiKey) {
       console.error("RAPIDAPI_KEY not configured");
+      // Fallback to config upcoming match data
+      const hasUpcoming = config?.next_match_date && new Date(config.next_match_date).getTime() > Date.now();
       return new Response(
-        JSON.stringify({ live: false, error: "API key not configured" }),
+        JSON.stringify({
+          live: false,
+          upcoming: !!hasUpcoming,
+          startTime: hasUpcoming ? config.next_match_date : null,
+          opponent: config?.opponent || "",
+          error: "API key not configured",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -72,8 +88,15 @@ Deno.serve(async (req) => {
     if (!response.ok) {
       const text = await response.text();
       console.error("RapidAPI error:", response.status, text);
+      const hasUpcoming = config?.next_match_date && new Date(config.next_match_date).getTime() > Date.now();
       return new Response(
-        JSON.stringify({ live: false, error: "Stream API unavailable" }),
+        JSON.stringify({
+          live: false,
+          upcoming: !!hasUpcoming,
+          startTime: hasUpcoming ? config.next_match_date : null,
+          opponent: config?.opponent || "",
+          error: "Stream API unavailable",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -92,20 +115,34 @@ Deno.serve(async (req) => {
       : null;
 
     if (!arsenalMatch) {
-      // Update is_live to false if currently live
+      // No live match - check for upcoming
       if (config?.is_live) {
-        await supabase
+        const { data: cfgForUpdate } = await supabase
           .from("site_config")
-          .update({ is_live: false })
-          .eq("id", config.id || (await supabase.from("site_config").select("id").limit(1).single()).data?.id);
+          .select("id")
+          .limit(1)
+          .single();
+        if (cfgForUpdate) {
+          await supabase
+            .from("site_config")
+            .update({ is_live: false })
+            .eq("id", cfgForUpdate.id);
+        }
       }
+
+      const hasUpcoming = config?.next_match_date && new Date(config.next_match_date).getTime() > Date.now();
       return new Response(
-        JSON.stringify({ live: false }),
+        JSON.stringify({
+          live: false,
+          upcoming: !!hasUpcoming,
+          startTime: hasUpcoming ? config.next_match_date : null,
+          opponent: config?.opponent || "",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Arsenal match found - auto-set live status
+    // Arsenal match found - set live
     const { data: cfgForUpdate } = await supabase
       .from("site_config")
       .select("id")
@@ -122,9 +159,11 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         live: true,
+        upcoming: false,
         homeTeam: arsenalMatch.home_team || arsenalMatch.homeTeam || "Home",
         awayTeam: arsenalMatch.away_team || arsenalMatch.awayTeam || "Away",
         streamUrl: arsenalMatch.stream_url || arsenalMatch.streamUrl || arsenalMatch.url || "",
+        startTime: arsenalMatch.start_time || arsenalMatch.startTime || null,
         league: arsenalMatch.league || arsenalMatch.competition || "Premier League",
         status: arsenalMatch.status || "LIVE",
         source: "rapidapi",
@@ -134,7 +173,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("arsenal-live error:", err);
     return new Response(
-      JSON.stringify({ live: false, error: "Internal error" }),
+      JSON.stringify({ live: false, upcoming: false, error: "Internal error" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
