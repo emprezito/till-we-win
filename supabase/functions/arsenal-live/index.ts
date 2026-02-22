@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Auto stream disabled - check for upcoming match from config
+    // Auto stream disabled
     if (!config?.enable_auto_stream) {
       const hasUpcoming = config?.next_match_date && new Date(config.next_match_date).getTime() > Date.now();
       return new Response(
@@ -55,13 +55,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch from RapidAPI
+    // Fetch from RapidAPI (API-Football v3)
     const rapidApiKey = Deno.env.get("RAPIDAPI_KEY");
-    const rapidApiHost = Deno.env.get("RAPIDAPI_HOST") || "football-live-streaming-api.p.rapidapi.com";
+    const rapidApiHost = Deno.env.get("RAPIDAPI_HOST") || "api-football-v1.p.rapidapi.com";
 
     if (!rapidApiKey) {
       console.error("RAPIDAPI_KEY not configured");
-      // Fallback to config upcoming match data
       const hasUpcoming = config?.next_match_date && new Date(config.next_match_date).getTime() > Date.now();
       return new Response(
         JSON.stringify({
@@ -75,8 +74,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    const response = await fetch(
-      `https://${rapidApiHost}/matches/live`,
+    // Step 1: Check for live Arsenal fixtures
+    const liveResponse = await fetch(
+      `https://${rapidApiHost}/v3/fixtures?live=all`,
       {
         headers: {
           "X-RapidAPI-Key": rapidApiKey,
@@ -85,91 +85,73 @@ Deno.serve(async (req) => {
       }
     );
 
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("RapidAPI error:", response.status, text);
-      const hasUpcoming = config?.next_match_date && new Date(config.next_match_date).getTime() > Date.now();
-      return new Response(
-        JSON.stringify({
-          live: false,
-          upcoming: !!hasUpcoming,
-          startTime: hasUpcoming ? config.next_match_date : null,
-          opponent: config?.opponent || "",
-          error: "Stream API unavailable",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!liveResponse.ok) {
+      const text = await liveResponse.text();
+      console.error("RapidAPI live error:", liveResponse.status, text);
+      
+      // Fallback: try to get next Arsenal fixture
+      return await getNextFixture(rapidApiKey, rapidApiHost, config, supabase, corsHeaders);
     }
 
-    const matches = await response.json();
+    const liveData = await liveResponse.json();
+    const liveFixtures = liveData?.response || [];
 
-    // Find Arsenal match
-    const arsenalMatch = Array.isArray(matches)
-      ? matches.find(
-          (m: any) =>
-            m.home_team?.toLowerCase().includes("arsenal") ||
-            m.away_team?.toLowerCase().includes("arsenal") ||
-            m.homeTeam?.toLowerCase().includes("arsenal") ||
-            m.awayTeam?.toLowerCase().includes("arsenal")
-        )
-      : null;
+    // Find Arsenal in live matches
+    const arsenalLive = liveFixtures.find(
+      (f: any) =>
+        f.teams?.home?.name?.toLowerCase().includes("arsenal") ||
+        f.teams?.away?.name?.toLowerCase().includes("arsenal")
+    );
 
-    if (!arsenalMatch) {
-      // No live match - check for upcoming
-      if (config?.is_live) {
-        const { data: cfgForUpdate } = await supabase
+    if (arsenalLive) {
+      // Arsenal match is LIVE
+      const { data: cfgForUpdate } = await supabase
+        .from("site_config")
+        .select("id")
+        .limit(1)
+        .single();
+
+      if (cfgForUpdate) {
+        await supabase
           .from("site_config")
-          .select("id")
-          .limit(1)
-          .single();
-        if (cfgForUpdate) {
-          await supabase
-            .from("site_config")
-            .update({ is_live: false })
-            .eq("id", cfgForUpdate.id);
-        }
+          .update({ is_live: true })
+          .eq("id", cfgForUpdate.id);
       }
 
-      const hasUpcoming = config?.next_match_date && new Date(config.next_match_date).getTime() > Date.now();
       return new Response(
         JSON.stringify({
-          live: false,
-          upcoming: !!hasUpcoming,
-          startTime: hasUpcoming ? config.next_match_date : null,
-          opponent: config?.opponent || "",
+          live: true,
+          upcoming: false,
+          homeTeam: arsenalLive.teams?.home?.name || "Home",
+          awayTeam: arsenalLive.teams?.away?.name || "Away",
+          streamUrl: "", // API-Football doesn't provide stream URLs
+          startTime: arsenalLive.fixture?.date || null,
+          league: arsenalLive.league?.name || "Premier League",
+          status: arsenalLive.fixture?.status?.long || "LIVE",
+          score: `${arsenalLive.goals?.home ?? 0} - ${arsenalLive.goals?.away ?? 0}`,
+          source: "api-football",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Arsenal match found - set live
-    const { data: cfgForUpdate } = await supabase
-      .from("site_config")
-      .select("id")
-      .limit(1)
-      .single();
-
-    if (cfgForUpdate) {
-      await supabase
+    // No live Arsenal match - check for upcoming
+    if (config?.is_live) {
+      const { data: cfgForUpdate } = await supabase
         .from("site_config")
-        .update({ is_live: true })
-        .eq("id", cfgForUpdate.id);
+        .select("id")
+        .limit(1)
+        .single();
+      if (cfgForUpdate) {
+        await supabase
+          .from("site_config")
+          .update({ is_live: false })
+          .eq("id", cfgForUpdate.id);
+      }
     }
 
-    return new Response(
-      JSON.stringify({
-        live: true,
-        upcoming: false,
-        homeTeam: arsenalMatch.home_team || arsenalMatch.homeTeam || "Home",
-        awayTeam: arsenalMatch.away_team || arsenalMatch.awayTeam || "Away",
-        streamUrl: arsenalMatch.stream_url || arsenalMatch.streamUrl || arsenalMatch.url || "",
-        startTime: arsenalMatch.start_time || arsenalMatch.startTime || null,
-        league: arsenalMatch.league || arsenalMatch.competition || "Premier League",
-        status: arsenalMatch.status || "LIVE",
-        source: "rapidapi",
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return await getNextFixture(rapidApiKey, rapidApiHost, config, supabase, corsHeaders);
+
   } catch (err) {
     console.error("arsenal-live error:", err);
     return new Response(
@@ -178,3 +160,84 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+async function getNextFixture(
+  rapidApiKey: string,
+  rapidApiHost: string,
+  config: any,
+  supabase: any,
+  corsHeaders: Record<string, string>
+) {
+  try {
+    // Arsenal team ID in API-Football is 42
+    const ARSENAL_ID = 42;
+    const nextResponse = await fetch(
+      `https://${rapidApiHost}/v3/fixtures?team=${ARSENAL_ID}&next=1`,
+      {
+        headers: {
+          "X-RapidAPI-Key": rapidApiKey,
+          "X-RapidAPI-Host": rapidApiHost,
+        },
+      }
+    );
+
+    if (nextResponse.ok) {
+      const nextData = await nextResponse.json();
+      const nextFixture = nextData?.response?.[0];
+
+      if (nextFixture) {
+        const startTime = nextFixture.fixture?.date;
+        const opponent = nextFixture.teams?.home?.name?.toLowerCase().includes("arsenal")
+          ? nextFixture.teams?.away?.name
+          : nextFixture.teams?.home?.name;
+
+        // Update site_config with next match info
+        const { data: cfgForUpdate } = await supabase
+          .from("site_config")
+          .select("id")
+          .limit(1)
+          .single();
+
+        if (cfgForUpdate && startTime) {
+          await supabase
+            .from("site_config")
+            .update({
+              next_match_date: startTime,
+              opponent: opponent || config?.opponent || "",
+            })
+            .eq("id", cfgForUpdate.id);
+        }
+
+        return new Response(
+          JSON.stringify({
+            live: false,
+            upcoming: true,
+            startTime,
+            opponent: opponent || config?.opponent || "",
+            league: nextFixture.league?.name || "Premier League",
+            source: "api-football",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      const text = await nextResponse.text();
+      console.error("RapidAPI next fixture error:", nextResponse.status, text);
+    }
+  } catch (err) {
+    console.error("Error fetching next fixture:", err);
+  }
+
+  // Final fallback to site_config
+  const hasUpcoming = config?.next_match_date && new Date(config.next_match_date).getTime() > Date.now();
+  return new Response(
+    JSON.stringify({
+      live: false,
+      upcoming: !!hasUpcoming,
+      startTime: hasUpcoming ? config.next_match_date : null,
+      opponent: config?.opponent || "",
+      source: "fallback",
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
