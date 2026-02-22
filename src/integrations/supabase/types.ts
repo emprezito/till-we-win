@@ -19,11 +19,13 @@ export type Database = {
           contract_address: string
           created_at: string
           discord_link: string
+          enable_auto_stream: boolean
           epl_status: string
           holder_count: string
           id: string
           is_live: boolean
           livestream_url: string
+          manual_override_stream_url: string
           market_cap: string
           matches_streamed: number
           mission_start_date: string
@@ -40,11 +42,13 @@ export type Database = {
           contract_address?: string
           created_at?: string
           discord_link?: string
+          enable_auto_stream?: boolean
           epl_status?: string
           holder_count?: string
           id?: string
           is_live?: boolean
           livestream_url?: string
+          manual_override_stream_url?: string
           market_cap?: string
           matches_streamed?: number
           mission_start_date?: string
@@ -61,11 +65,13 @@ export type Database = {
           contract_address?: string
           created_at?: string
           discord_link?: string
+          enable_auto_stream?: boolean
           epl_status?: string
           holder_count?: string
           id?: string
           is_live?: boolean
           livestream_url?: string
+          manual_override_stream_url?: string
           market_cap?: string
           matches_streamed?: number
           mission_start_date?: string

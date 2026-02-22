@@ -156,6 +156,8 @@ function ConfigSection({
         holder_count: form.holder_count,
         twitter_link: form.twitter_link,
         discord_link: form.discord_link,
+        enable_auto_stream: form.enable_auto_stream,
+        manual_override_stream_url: form.manual_override_stream_url,
       })
       .eq("id", config.id);
 
@@ -201,10 +203,15 @@ function ConfigSection({
       <Card>
         <CardHeader><CardTitle className="font-mono text-sm uppercase tracking-widest">Livestream Settings</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <Field label="YouTube Embed URL" value={form.livestream_url} onChange={(v) => update("livestream_url", v)} />
+          <div className="flex items-center gap-3">
+            <Switch checked={form.enable_auto_stream} onCheckedChange={(v) => update("enable_auto_stream", v)} />
+            <span className="font-mono text-sm text-muted-foreground">Auto-detect Arsenal streams (RapidAPI)</span>
+          </div>
+          <Field label="Manual Override Stream URL (overrides auto-detection)" value={form.manual_override_stream_url} onChange={(v) => update("manual_override_stream_url", v)} />
+          <Field label="Legacy YouTube Embed URL" value={form.livestream_url} onChange={(v) => update("livestream_url", v)} />
           <div className="flex items-center gap-3">
             <Switch checked={form.is_live} onCheckedChange={(v) => update("is_live", v)} />
-            <span className="font-mono text-sm text-muted-foreground">Stream is LIVE</span>
+            <span className="font-mono text-sm text-muted-foreground">Stream is LIVE (manual override)</span>
           </div>
         </CardContent>
       </Card>
