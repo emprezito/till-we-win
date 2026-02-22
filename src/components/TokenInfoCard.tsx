@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, Check, ExternalLink, TrendingUp, RefreshCw } from "lucide-react";
+import { Copy, Check, ExternalLink, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
 import type { SiteConfig } from "@/hooks/useSiteConfig";
 import { usePumpFunData, formatMarketCap, formatPrice } from "@/hooks/usePumpFunData";
 
@@ -10,7 +10,7 @@ interface TokenInfoCardProps {
 
 export function TokenInfoCard({ config }: TokenInfoCardProps) {
   const [copied, setCopied] = useState(false);
-  const { data: pumpData, isLoading: pumpLoading, dataUpdatedAt } = usePumpFunData(
+  const { data: tokenData, isLoading: tokenLoading } = usePumpFunData(
     config.contract_address || null
   );
 
@@ -21,11 +21,12 @@ export function TokenInfoCard({ config }: TokenInfoCardProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const liveMcap = pumpData?.market_cap;
-  const livePrice = pumpData?.price;
-  const liveVolume = pumpData?.volume_24h;
-  const liveName = pumpData?.name || config.token_name;
-  const liveSymbol = pumpData?.symbol || config.ticker;
+  const liveMcap = tokenData?.market_cap;
+  const livePrice = tokenData?.price;
+  const liveVolume = tokenData?.volume_24h;
+  const priceChange24h = tokenData?.price_change_24h;
+  const liveName = tokenData?.name || config.token_name;
+  const liveSymbol = tokenData?.symbol || config.ticker;
 
   return (
     <motion.div
@@ -38,9 +39,9 @@ export function TokenInfoCard({ config }: TokenInfoCardProps) {
         <h3 className="font-display text-xs uppercase tracking-[0.3em] text-muted-foreground">
           Token Intel
         </h3>
-        {pumpData && (
+        {tokenData && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <RefreshCw className={`h-3 w-3 ${pumpLoading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-3 w-3 ${tokenLoading ? "animate-spin" : ""}`} />
             <span>Live</span>
           </div>
         )}
@@ -55,32 +56,30 @@ export function TokenInfoCard({ config }: TokenInfoCardProps) {
           <span className="font-mono font-bold text-primary">{liveSymbol}</span>
         </div>
 
-        {/* Live price from Pump.fun */}
         {livePrice != null && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Price</span>
-            <span className="font-mono font-semibold text-foreground">
-              {formatPrice(livePrice)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-semibold text-foreground">
+                {formatPrice(livePrice)}
+              </span>
+              {priceChange24h != null && (
+                <span className={`flex items-center gap-0.5 font-mono text-xs font-semibold ${priceChange24h >= 0 ? "text-green-500" : "text-destructive"}`}>
+                  {priceChange24h >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  {priceChange24h >= 0 ? "+" : ""}{priceChange24h.toFixed(1)}%
+                </span>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Live market cap */}
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Market Cap</span>
-          <span className="flex items-center gap-1 font-mono font-semibold text-foreground">
-            {liveMcap != null ? (
-              <>
-                <TrendingUp className="h-3.5 w-3.5 text-green-500" />
-                {formatMarketCap(liveMcap)}
-              </>
-            ) : (
-              config.market_cap || "—"
-            )}
+          <span className="font-mono font-semibold text-foreground">
+            {liveMcap != null ? formatMarketCap(liveMcap) : (config.market_cap || "—")}
           </span>
         </div>
 
-        {/* Live volume */}
         {liveVolume != null && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">24h Volume</span>
@@ -90,7 +89,6 @@ export function TokenInfoCard({ config }: TokenInfoCardProps) {
           </div>
         )}
 
-        {/* Holders - fallback to config */}
         {config.holder_count && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Holders</span>
