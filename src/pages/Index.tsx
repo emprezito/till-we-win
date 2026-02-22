@@ -4,7 +4,7 @@ import { useSiteConfig } from "@/hooks/useSiteConfig";
 import { LiveIndicator } from "@/components/LiveIndicator";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { TokenInfoCard } from "@/components/TokenInfoCard";
-import { LivestreamEmbed } from "@/components/LivestreamEmbed";
+import { PrimaryLivestream } from "@/components/PrimaryLivestream";
 import { MissionProgress } from "@/components/MissionProgress";
 import { SlidesViewer } from "@/components/SlidesViewer";
 import { SocialLinks } from "@/components/SocialLinks";
@@ -64,6 +64,9 @@ const Index = () => {
         </div>
       </motion.section>
 
+      {/* Primary Livestream - Main Focus */}
+      <PrimaryLivestream />
+
       {/* Countdown + Token Info */}
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-2">
@@ -74,12 +77,6 @@ const Index = () => {
         </div>
         <TokenInfoCard config={config} />
       </div>
-
-      {/* Livestream */}
-      <LivestreamEmbed
-        url={config.livestream_url}
-        isLive={config.is_live}
-      />
 
       {/* Mission Progress */}
       <MissionProgress config={config} />
