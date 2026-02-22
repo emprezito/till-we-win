@@ -3,11 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface ArsenalLiveData {
   live: boolean;
+  upcoming?: boolean;
   homeTeam?: string;
   awayTeam?: string;
   streamUrl?: string;
+  startTime?: string | null;
   league?: string;
   status?: string;
+  opponent?: string;
   source?: string;
   error?: string;
 }
@@ -20,7 +23,7 @@ export function useArsenalLive() {
       if (error) throw error;
       return data as ArsenalLiveData;
     },
-    refetchInterval: 30000, // 30 seconds
+    refetchInterval: 30000,
     staleTime: 15000,
   });
 }
