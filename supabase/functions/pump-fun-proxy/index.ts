@@ -32,9 +32,15 @@ Deno.serve(async (req) => {
     const pairs = searchData.pairs;
 
     if (!pairs || pairs.length === 0) {
+      // Return 200 with nulls so frontend gracefully falls back to config values
       return new Response(
-        JSON.stringify({ error: "Token not found on DexScreener" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          name: null, symbol: null, price: null, market_cap: null,
+          volume_24h: null, price_change_24h: null, price_change_1h: null,
+          liquidity_usd: null, pair_address: null, dex: null, chain: null,
+          url: null, image_url: null, txns_24h_buys: null, txns_24h_sells: null,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
