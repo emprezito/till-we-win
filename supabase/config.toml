@@ -2,3 +2,6 @@ project_id = "wadvyhwbdukdichmkidk"
 
 [functions.fetch-arsenal-fixtures]
 verify_jwt = false
+
+[functions.pump-fun-proxy]
+verify_jwt = false
