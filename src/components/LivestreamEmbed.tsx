@@ -7,8 +7,26 @@ interface LivestreamEmbedProps {
   compact?: boolean;
 }
 
+function toEmbedUrl(raw: string): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  // Already an embed URL
+  if (trimmed.includes("youtube.com/embed/")) return trimmed;
+  // youtube.com/live/VIDEO_ID
+  const liveMatch = trimmed.match(/youtube\.com\/live\/([a-zA-Z0-9_-]+)/);
+  if (liveMatch) return `https://www.youtube.com/embed/${liveMatch[1]}?autoplay=1`;
+  // youtube.com/watch?v=VIDEO_ID
+  const watchMatch = trimmed.match(/[?&]v=([a-zA-Z0-9_-]+)/);
+  if (watchMatch) return `https://www.youtube.com/embed/${watchMatch[1]}?autoplay=1`;
+  // youtu.be/VIDEO_ID
+  const shortMatch = trimmed.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
+  if (shortMatch) return `https://www.youtube.com/embed/${shortMatch[1]}?autoplay=1`;
+  return trimmed;
+}
+
 export function LivestreamEmbed({ url, isLive, compact }: LivestreamEmbedProps) {
-  const hasUrl = url && url.trim().length > 0;
+  const embedUrl = toEmbedUrl(url);
+  const hasUrl = embedUrl.length > 0;
 
   return (
     <motion.div
@@ -26,7 +44,7 @@ export function LivestreamEmbed({ url, isLive, compact }: LivestreamEmbedProps) 
       <div className={`relative ${compact ? "aspect-video" : "aspect-video"}`}>
         {hasUrl ? (
           <iframe
-            src={url}
+            src={embedUrl}
             className="h-full w-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
