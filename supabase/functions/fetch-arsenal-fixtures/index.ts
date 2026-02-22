@@ -6,9 +6,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Current EPL season
-const SEASON = "2025-26";
-const FIXTURES_URL = `https://raw.githubusercontent.com/openfootball/football.json/master/${SEASON}/en.1.json`;
+// Try multiple seasons to find fixture data
+const SEASONS = ["2025-26", "2024-25"];
+
+async function fetchFixturesForSeason(season: string) {
+  const url = `https://raw.githubusercontent.com/openfootball/football.json/master/${season}/en.1.json`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  return res.json();
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -16,31 +22,36 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Fetch fixtures from openfootball
-    const res = await fetch(FIXTURES_URL);
-    if (!res.ok) {
-      throw new Error(`Failed to fetch fixtures: ${res.status}`);
+    let data = null;
+
+    // Try each season until we find valid data
+    for (const season of SEASONS) {
+      data = await fetchFixturesForSeason(season);
+      if (data?.rounds?.length) break;
     }
 
-    const data = await res.json();
+    if (!data?.rounds?.length) {
+      return new Response(
+        JSON.stringify({ message: "No fixture data available from API. Please set fixtures manually." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Find next Arsenal match
     const now = new Date();
     let nextMatch: { date: string; opponent: string } | null = null;
 
-    for (const round of data.rounds || []) {
+    for (const round of data.rounds) {
       for (const match of round.matches || []) {
         const matchDate = new Date(match.date);
         if (matchDate <= now) continue;
 
-        const isArsenal =
-          match.team1?.name?.includes("Arsenal") ||
-          match.team2?.name?.includes("Arsenal");
+        const team1 = match.team1?.name || "";
+        const team2 = match.team2?.name || "";
+        const isArsenal = team1.includes("Arsenal") || team2.includes("Arsenal");
 
         if (isArsenal) {
-          const opponent = match.team1?.name?.includes("Arsenal")
-            ? match.team2?.name
-            : match.team1?.name;
+          const opponent = team1.includes("Arsenal") ? team2 : team1;
 
           if (!nextMatch || matchDate < new Date(nextMatch.date)) {
             nextMatch = {
@@ -56,12 +67,12 @@ Deno.serve(async (req) => {
 
     if (!nextMatch) {
       return new Response(
-        JSON.stringify({ message: "No upcoming Arsenal matches found" }),
+        JSON.stringify({ message: "No upcoming Arsenal matches found in available data." }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Update site_config in Supabase
+    // Update site_config in database
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
