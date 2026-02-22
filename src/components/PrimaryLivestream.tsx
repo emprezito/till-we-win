@@ -9,66 +9,85 @@ function HlsPlayer({ servers, streamUrl }: { servers?: StreamServer[]; streamUrl
   const hlsRef = useRef<Hls | null>(null);
   const [currentServerIndex, setCurrentServerIndex] = useState(0);
   const [error, setError] = useState(false);
+  const loadedUrlRef = useRef<string>("");
 
   // Filter to only m3u8 direct streams
   const hlsServers = (servers || []).filter(
     (s) => s.type === "direct" && s.url.includes(".m3u8")
   );
-  const activeUrl = hlsServers.length > 0 ? hlsServers[currentServerIndex]?.url || streamUrl : streamUrl;
+  const activeUrl = hlsServers.length > 0
+    ? hlsServers[Math.min(currentServerIndex, hlsServers.length - 1)]?.url || streamUrl
+    : streamUrl;
 
-  const loadStream = useCallback((url: string) => {
+  useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !activeUrl) return;
 
-    // Destroy previous instance
+    // Don't reload if already playing this URL
+    if (loadedUrlRef.current === activeUrl && hlsRef.current) return;
+    loadedUrlRef.current = activeUrl;
+
+    // Destroy previous
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
-
     setError(false);
 
-    if (url.includes(".m3u8") && Hls.isSupported()) {
+    if (activeUrl.includes(".m3u8") && Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
-        xhrSetup: (xhr) => {
-          // Some streams need specific headers — skip for now as browser CORS may block
-        },
+        maxBufferLength: 30,
+        fragLoadingMaxRetry: 3,
+        manifestLoadingMaxRetry: 3,
+        levelLoadingMaxRetry: 3,
       });
-      hls.loadSource(url);
+      hls.loadSource(activeUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         video.play().catch(() => {});
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
-          console.warn("HLS fatal error, trying next server:", data.type);
-          setError(true);
+          console.warn("HLS fatal error:", data.type, data.details);
+          hls.destroy();
+          hlsRef.current = null;
+          loadedUrlRef.current = "";
+          // Auto-try next server
+          if (hlsServers.length > 1) {
+            setCurrentServerIndex((prev) => (prev + 1) % hlsServers.length);
+          } else {
+            setError(true);
+          }
         }
       });
       hlsRef.current = hls;
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // Safari native HLS
-      video.src = url;
-      video.addEventListener("loadedmetadata", () => video.play().catch(() => {}));
+      video.src = activeUrl;
+      video.addEventListener("loadedmetadata", () => video.play().catch(() => {}), { once: true });
     } else {
       setError(true);
     }
-  }, []);
 
+    return () => {
+      // Only cleanup on unmount, not on re-renders
+    };
+  }, [activeUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cleanup on unmount only
   useEffect(() => {
-    loadStream(activeUrl);
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
-  }, [activeUrl, loadStream]);
+  }, []);
 
   const tryNextServer = () => {
     if (hlsServers.length > 1) {
+      loadedUrlRef.current = "";
       setCurrentServerIndex((prev) => (prev + 1) % hlsServers.length);
     }
   };
@@ -91,7 +110,7 @@ function HlsPlayer({ servers, streamUrl }: { servers?: StreamServer[]; streamUrl
                 onClick={tryNextServer}
                 className="font-mono text-xs px-4 py-2 rounded border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
               >
-                Try Server {((currentServerIndex + 1) % hlsServers.length) + 1} of {hlsServers.length}
+                Try Next Server ({hlsServers.length} available)
               </button>
             )}
           </div>
@@ -101,7 +120,10 @@ function HlsPlayer({ servers, streamUrl }: { servers?: StreamServer[]; streamUrl
         <div className="absolute top-2 right-2 z-10">
           <select
             value={currentServerIndex}
-            onChange={(e) => setCurrentServerIndex(Number(e.target.value))}
+            onChange={(e) => {
+              loadedUrlRef.current = "";
+              setCurrentServerIndex(Number(e.target.value));
+            }}
             className="font-mono text-xs bg-black/70 text-foreground border border-border rounded px-2 py-1"
           >
             {hlsServers.map((s, i) => (
