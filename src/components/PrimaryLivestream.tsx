@@ -1,7 +1,118 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
+import Hls from "hls.js";
 import { LiveIndicator } from "./LiveIndicator";
-import { useArsenalLive } from "@/hooks/useArsenalLive";
+import { useArsenalLive, StreamServer } from "@/hooks/useArsenalLive";
+
+function HlsPlayer({ servers, streamUrl }: { servers?: StreamServer[]; streamUrl: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
+  const [currentServerIndex, setCurrentServerIndex] = useState(0);
+  const [error, setError] = useState(false);
+
+  // Filter to only m3u8 direct streams
+  const hlsServers = (servers || []).filter(
+    (s) => s.type === "direct" && s.url.includes(".m3u8")
+  );
+  const activeUrl = hlsServers.length > 0 ? hlsServers[currentServerIndex]?.url || streamUrl : streamUrl;
+
+  const loadStream = useCallback((url: string) => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Destroy previous instance
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    setError(false);
+
+    if (url.includes(".m3u8") && Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+        xhrSetup: (xhr) => {
+          // Some streams need specific headers — skip for now as browser CORS may block
+        },
+      });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(() => {});
+      });
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          console.warn("HLS fatal error, trying next server:", data.type);
+          setError(true);
+        }
+      });
+      hlsRef.current = hls;
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Safari native HLS
+      video.src = url;
+      video.addEventListener("loadedmetadata", () => video.play().catch(() => {}));
+    } else {
+      setError(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStream(activeUrl);
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [activeUrl, loadStream]);
+
+  const tryNextServer = () => {
+    if (hlsServers.length > 1) {
+      setCurrentServerIndex((prev) => (prev + 1) % hlsServers.length);
+    }
+  };
+
+  return (
+    <div className="relative w-full aspect-video bg-black">
+      <video
+        ref={videoRef}
+        className="absolute inset-0 w-full h-full"
+        controls
+        playsInline
+        muted
+      />
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
+          <div className="text-center px-4">
+            <p className="font-mono text-sm text-destructive mb-2">Stream failed to load</p>
+            {hlsServers.length > 1 && (
+              <button
+                onClick={tryNextServer}
+                className="font-mono text-xs px-4 py-2 rounded border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              >
+                Try Server {((currentServerIndex + 1) % hlsServers.length) + 1} of {hlsServers.length}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {hlsServers.length > 1 && !error && (
+        <div className="absolute top-2 right-2 z-10">
+          <select
+            value={currentServerIndex}
+            onChange={(e) => setCurrentServerIndex(Number(e.target.value))}
+            className="font-mono text-xs bg-black/70 text-foreground border border-border rounded px-2 py-1"
+          >
+            {hlsServers.map((s, i) => (
+              <option key={i} value={i}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function useCountdown(targetDate: string | null) {
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0, expired: true });
@@ -81,15 +192,10 @@ export function PrimaryLivestream() {
           </div>
           <LiveIndicator isLive={true} />
         </div>
-        <div className="relative w-full aspect-video">
-          <iframe
-            src={data.streamUrl}
-            className="absolute inset-0 w-full h-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            title="Arsenal Live Stream"
-          />
-        </div>
+        <HlsPlayer
+          servers={data.servers}
+          streamUrl={data.streamUrl}
+        />
       </motion.div>
     );
   }

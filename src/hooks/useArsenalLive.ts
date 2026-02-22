@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+export interface StreamServer {
+  name: string;
+  url: string;
+  type: string;
+  header?: Record<string, string>;
+}
+
 export interface ArsenalLiveData {
   live: boolean;
   upcoming?: boolean;
@@ -13,6 +20,8 @@ export interface ArsenalLiveData {
   opponent?: string;
   source?: string;
   error?: string;
+  score?: string;
+  servers?: StreamServer[];
 }
 
 export function useArsenalLive() {
