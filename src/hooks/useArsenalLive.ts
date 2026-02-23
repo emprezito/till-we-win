@@ -25,26 +25,10 @@ export interface ArsenalLiveData {
   servers?: StreamServer[];
 }
 
-// TEMPORARY MOCK: Set to true to test the finished match scoreboard UI
-const MOCK_FINISHED_STATE = true;
-
 export function useArsenalLive() {
   return useQuery<ArsenalLiveData>({
     queryKey: ["arsenal-live"],
     queryFn: async () => {
-      if (MOCK_FINISHED_STATE) {
-        return {
-          live: false,
-          upcoming: false,
-          finished: true,
-          homeTeam: "Tottenham",
-          awayTeam: "Arsenal",
-          score: "1 - 2",
-          league: "Premier League",
-          opponent: "Tottenham",
-          source: "mock",
-        } as ArsenalLiveData;
-      }
       const { data, error } = await supabase.functions.invoke("arsenal-live");
       if (error) throw error;
       return data as ArsenalLiveData;
