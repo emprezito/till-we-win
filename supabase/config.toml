@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.pump-fun-proxy]
 verify_jwt = false
+
+[functions.all-matches]
+verify_jwt = false
