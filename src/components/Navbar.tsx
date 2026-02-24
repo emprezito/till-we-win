@@ -5,6 +5,7 @@ const links = [
   { to: "/", label: "MISSION CONTROL" },
   { to: "/mission", label: "MISSION" },
   { to: "/live", label: "LIVE" },
+  { to: "/matches", label: "MATCHES" },
 ];
 
 export function Navbar() {
