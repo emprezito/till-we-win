@@ -13,13 +13,16 @@ async function fetchMatches(
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
   }
+  console.log("Fetching:", url.toString());
   const res = await fetch(url.toString(), {
     headers: {
       "X-RapidAPI-Key": rapidApiKey,
       "X-RapidAPI-Host": rapidApiHost,
     },
   });
-  return res.json();
+  const data = await res.json();
+  console.log(`Response for status=${params.status}: ${JSON.stringify(data).substring(0, 500)}`);
+  return data;
 }
 
 async function fetchMatchLink(
@@ -71,18 +74,27 @@ Deno.serve(async (req) => {
     const page = body.page || "1";
 
     if (status === "all") {
-      // Fetch live, upcoming, and finished in parallel
       const [liveData, upcomingData, finishedData] = await Promise.all([
         fetchMatches(rapidApiKey, rapidApiHost, { status: "live", page: "1" }),
         fetchMatches(rapidApiKey, rapidApiHost, { status: "vs", page: "1" }),
         fetchMatches(rapidApiKey, rapidApiHost, { status: "finished", page: "1" }),
       ]);
 
+      const extractMatches = (d: any) => {
+        if (d?.message && typeof d.message === "string" && d.message.includes("exceeded")) {
+          throw new Error(d.message);
+        }
+        if (Array.isArray(d)) return d;
+        if (d?.matches && Array.isArray(d.matches)) return d.matches;
+        if (d?.data && Array.isArray(d.data)) return d.data;
+        return [];
+      };
+
       return new Response(
         JSON.stringify({
-          live: liveData?.matches || [],
-          upcoming: upcomingData?.matches || [],
-          finished: finishedData?.matches || [],
+          live: extractMatches(liveData),
+          upcoming: extractMatches(upcomingData),
+          finished: extractMatches(finishedData),
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
