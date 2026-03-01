@@ -37,6 +37,7 @@ export type Database = {
       }
       site_config: {
         Row: {
+          cached_servers: Json
           contract_address: string
           created_at: string
           discord_link: string
@@ -48,6 +49,12 @@ export type Database = {
           livestream_url: string
           manual_override_stream_url: string
           market_cap: string
+          match_away_team: string
+          match_home_team: string
+          match_league: string
+          match_score: string
+          match_start_time: string | null
+          match_status: string
           matches_streamed: number
           mission_start_date: string
           next_match_date: string | null
@@ -60,6 +67,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cached_servers?: Json
           contract_address?: string
           created_at?: string
           discord_link?: string
@@ -71,6 +79,12 @@ export type Database = {
           livestream_url?: string
           manual_override_stream_url?: string
           market_cap?: string
+          match_away_team?: string
+          match_home_team?: string
+          match_league?: string
+          match_score?: string
+          match_start_time?: string | null
+          match_status?: string
           matches_streamed?: number
           mission_start_date?: string
           next_match_date?: string | null
@@ -83,6 +97,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cached_servers?: Json
           contract_address?: string
           created_at?: string
           discord_link?: string
@@ -94,6 +109,12 @@ export type Database = {
           livestream_url?: string
           manual_override_stream_url?: string
           market_cap?: string
+          match_away_team?: string
+          match_home_team?: string
+          match_league?: string
+          match_score?: string
+          match_start_time?: string | null
+          match_status?: string
           matches_streamed?: number
           mission_start_date?: string
           next_match_date?: string | null

@@ -25,15 +25,44 @@ export interface ArsenalLiveData {
   servers?: StreamServer[];
 }
 
+/**
+ * Reads cached match data from site_config instead of calling
+ * the edge function directly. This costs ZERO API requests.
+ * The edge function is only called by the backend cron job.
+ */
 export function useArsenalLive() {
   return useQuery<ArsenalLiveData>({
     queryKey: ["arsenal-live"],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("arsenal-live");
+      const { data, error } = await supabase
+        .from("site_config")
+        .select(
+          "is_live, match_status, match_home_team, match_away_team, match_score, match_league, match_start_time, cached_servers, opponent, livestream_url"
+        )
+        .single();
+
       if (error) throw error;
-      return data as ArsenalLiveData;
+      if (!data) return { live: false, source: "no_config" };
+
+      const status = (data as any).match_status || "none";
+      const servers = ((data as any).cached_servers || []) as StreamServer[];
+
+      return {
+        live: data.is_live,
+        upcoming: status === "upcoming",
+        finished: status === "finished",
+        homeTeam: (data as any).match_home_team || undefined,
+        awayTeam: (data as any).match_away_team || undefined,
+        score: (data as any).match_score || undefined,
+        league: (data as any).match_league || undefined,
+        startTime: (data as any).match_start_time || null,
+        streamUrl: data.livestream_url || undefined,
+        opponent: data.opponent || undefined,
+        servers,
+        source: "cached",
+      };
     },
-    refetchInterval: 30000,
-    staleTime: 15000,
+    refetchInterval: 15000, // Read DB every 15s (free, no API cost)
+    staleTime: 10000,
   });
 }
