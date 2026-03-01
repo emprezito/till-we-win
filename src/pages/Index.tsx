@@ -28,18 +28,18 @@ const Index = () => {
   if (!config) return null;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 space-y-10">
+    <div className="mx-auto max-w-7xl px-3 sm:px-4 py-6 sm:py-8 space-y-6 sm:space-y-10">
       {/* Hero Section */}
       <motion.section
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8 }}
-        className="relative overflow-hidden rounded-2xl border border-border bg-card p-8 sm:p-12 text-center"
+        className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 sm:p-12 text-center"
       >
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent" />
         <div className="relative z-10">
           <LiveIndicator isLive={config.is_live} />
-          <h1 className="mt-6 font-display text-5xl font-black tracking-wider text-foreground sm:text-7xl text-glow-red">
+          <h1 className="mt-6 font-display text-3xl font-black tracking-wider text-foreground sm:text-7xl text-glow-red">
             TIL WE WIN
           </h1>
           <p className="mt-4 font-mono text-sm text-muted-foreground sm:text-base">

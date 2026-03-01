@@ -20,10 +20,10 @@ function calculateTimeLeft(target: string) {
 function TimeUnit({ value, label }: { value: number; label: string }) {
   return (
     <div className="flex flex-col items-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-border bg-secondary font-mono text-2xl font-bold text-foreground sm:h-20 sm:w-20 sm:text-3xl">
+      <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-secondary font-mono text-xl font-bold text-foreground sm:h-20 sm:w-20 sm:text-3xl">
         {String(value).padStart(2, "0")}
       </div>
-      <span className="mt-2 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+      <span className="mt-1.5 font-mono text-[10px] sm:text-xs uppercase tracking-widest text-muted-foreground">
         {label}
       </span>
     </div>
@@ -59,7 +59,7 @@ export function CountdownTimer({ targetDate, opponent }: CountdownTimerProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
-      className="rounded-xl border border-border bg-card p-6 sm:p-8"
+      className="rounded-xl border border-border bg-card p-4 sm:p-8"
     >
       <div className="mb-4 text-center">
         <h3 className="font-display text-xs uppercase tracking-[0.3em] text-muted-foreground">
@@ -71,13 +71,13 @@ export function CountdownTimer({ targetDate, opponent }: CountdownTimerProps) {
           </p>
         )}
       </div>
-      <div className="flex items-center justify-center gap-3 sm:gap-4">
+      <div className="flex items-center justify-center gap-1.5 sm:gap-4">
         <TimeUnit value={timeLeft.days} label="Days" />
-        <span className="mt-[-1rem] font-mono text-2xl text-muted-foreground">:</span>
+        <span className="mt-[-1rem] font-mono text-lg sm:text-2xl text-muted-foreground">:</span>
         <TimeUnit value={timeLeft.hours} label="Hrs" />
-        <span className="mt-[-1rem] font-mono text-2xl text-muted-foreground">:</span>
+        <span className="mt-[-1rem] font-mono text-lg sm:text-2xl text-muted-foreground">:</span>
         <TimeUnit value={timeLeft.minutes} label="Min" />
-        <span className="mt-[-1rem] font-mono text-2xl text-muted-foreground">:</span>
+        <span className="mt-[-1rem] font-mono text-lg sm:text-2xl text-muted-foreground">:</span>
         <TimeUnit value={timeLeft.seconds} label="Sec" />
       </div>
     </motion.div>
