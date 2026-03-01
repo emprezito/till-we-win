@@ -18,7 +18,7 @@ const Live = () => {
   if (!config) return null;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 space-y-6">
+    <div className="mx-auto max-w-7xl px-3 sm:px-4 py-6 sm:py-8 space-y-6">
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           <PrimaryLivestream />
