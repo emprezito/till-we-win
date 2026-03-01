@@ -8,7 +8,7 @@ import { Footer } from "@/components/Footer";
 import Index from "./pages/Index";
 import Mission from "./pages/Mission";
 import Live from "./pages/Live";
-import Matches from "./pages/Matches";
+import Community from "./pages/Community";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
@@ -27,7 +27,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/mission" element={<Mission />} />
               <Route path="/live" element={<Live />} />
-              <Route path="/matches" element={<Matches />} />
+              <Route path="/community" element={<Community />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
