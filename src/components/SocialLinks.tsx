@@ -17,10 +17,16 @@ function DiscordIcon() {
 }
 
 export function SocialLinks({ config }: { config: SiteConfig }) {
+  const ensureAbsoluteUrl = (url: string) => {
+    if (!url) return url;
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    return `https://${url}`;
+  };
+
   const links = [
-    { href: config.twitter_link, icon: TwitterIcon, label: "X (Twitter)" },
-    { href: config.pumpfun_link, icon: () => <span className="font-mono text-xs font-bold">PUMP</span>, label: "Pump.fun" },
-    { href: config.discord_link, icon: DiscordIcon, label: "Discord" },
+    { href: config.twitter_link ? ensureAbsoluteUrl(config.twitter_link) : "", icon: TwitterIcon, label: "X (Twitter)" },
+    { href: config.pumpfun_link ? ensureAbsoluteUrl(config.pumpfun_link) : "", icon: () => <span className="font-mono text-xs font-bold">PUMP</span>, label: "Pump.fun" },
+    { href: config.discord_link ? ensureAbsoluteUrl(config.discord_link) : "", icon: DiscordIcon, label: "Discord" },
   ].filter((l) => l.href);
 
   if (links.length === 0) return null;
