@@ -8,6 +8,7 @@ import { PrimaryLivestream } from "@/components/PrimaryLivestream";
 import { MissionProgress } from "@/components/MissionProgress";
 import { SlidesViewer } from "@/components/SlidesViewer";
 import { SocialLinks } from "@/components/SocialLinks";
+import { MatchDayCard } from "@/components/MatchDayCard";
 
 const Index = () => {
   const { data: config, isLoading } = useSiteConfig();
@@ -77,6 +78,9 @@ const Index = () => {
         </div>
         <TokenInfoCard config={config} />
       </div>
+
+      {/* Match Day Card - Shareable */}
+      <MatchDayCard config={config} />
 
       {/* Mission Progress */}
       <MissionProgress config={config} />
