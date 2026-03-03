@@ -35,6 +35,54 @@ export type Database = {
         }
         Relationships: []
       }
+      match_recordings: {
+        Row: {
+          away_team: string
+          created_at: string
+          duration_seconds: number | null
+          expires_at: string
+          file_size_mb: number | null
+          home_team: string
+          id: string
+          league: string
+          match_date: string | null
+          match_title: string
+          recording_url: string
+          score: string
+          thumbnail_url: string | null
+        }
+        Insert: {
+          away_team?: string
+          created_at?: string
+          duration_seconds?: number | null
+          expires_at?: string
+          file_size_mb?: number | null
+          home_team?: string
+          id?: string
+          league?: string
+          match_date?: string | null
+          match_title: string
+          recording_url: string
+          score?: string
+          thumbnail_url?: string | null
+        }
+        Update: {
+          away_team?: string
+          created_at?: string
+          duration_seconds?: number | null
+          expires_at?: string
+          file_size_mb?: number | null
+          home_team?: string
+          id?: string
+          league?: string
+          match_date?: string | null
+          match_title?: string
+          recording_url?: string
+          score?: string
+          thumbnail_url?: string | null
+        }
+        Relationships: []
+      }
       site_config: {
         Row: {
           cached_servers: Json

@@ -10,6 +10,7 @@ import Mission from "./pages/Mission";
 import Live from "./pages/Live";
 import Community from "./pages/Community";
 import Admin from "./pages/Admin";
+import Rewatch from "./pages/Rewatch";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
               <Route path="/mission" element={<Mission />} />
               <Route path="/live" element={<Live />} />
               <Route path="/community" element={<Community />} />
+              <Route path="/rewatch" element={<Rewatch />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
