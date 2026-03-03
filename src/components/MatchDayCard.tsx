@@ -1,6 +1,6 @@
 import { useRef, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Share2, Trophy, Download, TrendingUp, TrendingDown } from "lucide-react";
+import { Share2, Trophy, Download, TrendingUp, TrendingDown, Swords } from "lucide-react";
 import { toPng } from "html-to-image";
 import type { SiteConfig } from "@/hooks/useSiteConfig";
 import { usePumpFunData, formatMarketCap, formatPrice } from "@/hooks/usePumpFunData";
@@ -14,24 +14,6 @@ export function MatchDayCard({ config }: MatchDayCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const { data: tokenData } = usePumpFunData(config.contract_address || null);
 
-  const downloadCard = useCallback(async () => {
-    if (!cardRef.current) return;
-    try {
-      const dataUrl = await toPng(cardRef.current, {
-        pixelRatio: 2,
-        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--background').trim()
-          ? `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--background').trim()})`
-          : '#0a0a0a',
-      });
-      const link = document.createElement("a");
-      link.download = `tww-matchday-${Date.now()}.png`;
-      link.href = dataUrl;
-      link.click();
-    } catch (err) {
-      console.error("Failed to download card:", err);
-    }
-  }, []);
-
   const livePrice = tokenData?.price;
   const liveMcap = tokenData?.market_cap;
   const priceChange24h = tokenData?.price_change_24h;
@@ -44,6 +26,55 @@ export function MatchDayCard({ config }: MatchDayCardProps) {
       : null;
 
   const isMatchLive = config.match_status === "live" || config.match_status === "LIVE";
+  const isUpcoming = config.match_status === "upcoming";
+  const isFinished = config.match_status === "finished";
+
+  const statusLabel = isMatchLive ? "LIVE NOW" : isUpcoming ? "UPCOMING" : isFinished ? "FULL TIME" : "MATCH DAY";
+
+  const downloadCard = useCallback(async () => {
+    if (!cardRef.current) return;
+    try {
+      const dataUrl = await toPng(cardRef.current, {
+        pixelRatio: 3,
+        backgroundColor: "#0a0a0a",
+      });
+      const link = document.createElement("a");
+      link.download = `tww-matchday-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("Failed to download card:", err);
+    }
+  }, []);
+
+  const shareCard = useCallback(async () => {
+    if (!cardRef.current) return;
+    try {
+      const dataUrl = await toPng(cardRef.current, {
+        pixelRatio: 3,
+        backgroundColor: "#0a0a0a",
+      });
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], "tww-matchday.png", { type: "image/png" });
+
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: `${config.match_home_team} vs ${config.match_away_team} | ${liveSymbol}`,
+          text: `${config.match_home_team} ${config.match_score} ${config.match_away_team}\n${liveSymbol} Price: ${livePrice != null ? formatPrice(livePrice) : "—"}\nMcap: ${liveMcap != null ? formatMarketCap(liveMcap) : "—"}\n\nTIL WE WIN 🔴`,
+          url: "https://till-we-win.lovable.app",
+          files: [file],
+        });
+      } else if (navigator.share) {
+        await navigator.share({
+          title: `${config.match_home_team} vs ${config.match_away_team} | ${liveSymbol}`,
+          text: `${config.match_home_team} ${config.match_score} ${config.match_away_team}\n${liveSymbol} Price: ${livePrice != null ? formatPrice(livePrice) : "—"}\nMcap: ${liveMcap != null ? formatMarketCap(liveMcap) : "—"}\n\nTIL WE WIN 🔴`,
+          url: "https://till-we-win.lovable.app",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to share card:", err);
+    }
+  }, [config, livePrice, liveMcap, liveSymbol]);
 
   return (
     <motion.div
@@ -52,7 +83,7 @@ export function MatchDayCard({ config }: MatchDayCardProps) {
       transition={{ duration: 0.6, delay: 0.2 }}
       className="relative overflow-hidden rounded-2xl border border-border bg-card"
     >
-      {/* Header */}
+      {/* Action buttons — outside the captured card */}
       <div className="flex items-center justify-between border-b border-border bg-secondary/50 px-4 py-2.5 sm:px-6">
         <h3 className="font-display text-xs uppercase tracking-[0.3em] text-muted-foreground">
           Match Day Card
@@ -66,15 +97,7 @@ export function MatchDayCard({ config }: MatchDayCardProps) {
             Save
           </button>
           <button
-            onClick={() => {
-              if (navigator.share) {
-                navigator.share({
-                  title: `${config.match_home_team} vs ${config.match_away_team} | ${liveSymbol}`,
-                  text: `${config.match_home_team} ${config.match_score} ${config.match_away_team}\n${liveSymbol} Price: ${livePrice != null ? formatPrice(livePrice) : "—"}\nMcap: ${liveMcap != null ? formatMarketCap(liveMcap) : "—"}\n\nTIL WE WIN 🔴`,
-                  url: window.location.href,
-                }).catch(() => {});
-              }
-            }}
+            onClick={shareCard}
             className="flex items-center gap-1.5 rounded-md bg-primary/10 px-3 py-1.5 font-mono text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
           >
             <Share2 className="h-3.5 w-3.5" />
@@ -83,92 +106,149 @@ export function MatchDayCard({ config }: MatchDayCardProps) {
         </div>
       </div>
 
-      {/* Card body — designed to be screenshot-friendly */}
-      <div ref={cardRef} id="match-day-card" className="space-y-4 p-4 sm:p-6">
-        {/* Match Info */}
-        <div className="text-center">
-          {matchDate && (
-            <p className="mb-2 font-mono text-xs text-muted-foreground">{matchDate}</p>
-          )}
-          {config.match_league && (
-            <span className="inline-block rounded-full bg-secondary px-3 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              {config.match_league}
+      {/* ====== BRANDED CARD — this is what gets exported ====== */}
+      <div
+        ref={cardRef}
+        id="match-day-card"
+        style={{ background: "linear-gradient(170deg, #0a0a0a 0%, #1a0a0a 50%, #0a0a0a 100%)" }}
+        className="relative space-y-5 p-5 sm:p-8"
+      >
+        {/* Brand Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600">
+              <Trophy className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <p style={{ color: "#ffffff", fontSize: "14px", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" as const }}>
+                {config.token_name || "TIL WE WIN"}
+              </p>
+              <p style={{ color: "#888888", fontSize: "10px", fontFamily: "monospace" }}>
+                till-we-win.lovable.app
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                background: isMatchLive ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.08)",
+                padding: "4px 12px",
+                borderRadius: "9999px",
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "0.15em",
+                color: isMatchLive ? "#ef4444" : "#888888",
+                fontFamily: "monospace",
+                textTransform: "uppercase" as const,
+              }}
+            >
+              {isMatchLive && (
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", display: "inline-block" }} />
+              )}
+              {statusLabel}
             </span>
+          </div>
+        </div>
+
+        {/* League & Date */}
+        <div style={{ textAlign: "center" }}>
+          {config.match_league && (
+            <p style={{ color: "#888888", fontSize: "11px", fontFamily: "monospace", textTransform: "uppercase" as const, letterSpacing: "0.2em", marginBottom: "4px" }}>
+              {config.match_league}
+            </p>
+          )}
+          {matchDate && (
+            <p style={{ color: "#666666", fontSize: "11px", fontFamily: "monospace" }}>{matchDate}</p>
           )}
         </div>
 
         {/* Scoreboard */}
-        <div className="flex items-center justify-center gap-3 sm:gap-6">
-          <div className="flex-1 text-right">
-            <p className="font-display text-sm font-bold uppercase tracking-wide text-foreground sm:text-lg">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px" }}>
+          <div style={{ flex: 1, textAlign: "right" }}>
+            <p style={{ color: "#ffffff", fontSize: "18px", fontWeight: 800, textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
               {config.match_home_team || "Home"}
             </p>
           </div>
 
-          <div className="relative flex items-center gap-2">
-            {isMatchLive && (
-              <span className="absolute -top-5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-destructive/20 px-2 py-0.5">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-destructive" />
-                <span className="font-mono text-[10px] font-bold uppercase text-destructive">Live</span>
-              </span>
-            )}
-            <div className="flex items-center gap-1 rounded-xl bg-secondary px-4 py-2 sm:px-6 sm:py-3">
-              <span className="font-display text-2xl font-black text-foreground sm:text-4xl">
+          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <div style={{
+              background: "rgba(255,255,255,0.06)",
+              borderRadius: "16px",
+              padding: "12px 24px",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}>
+              <span style={{ color: "#ffffff", fontSize: "32px", fontWeight: 900, fontFamily: "monospace" }}>
                 {config.match_score || "— : —"}
               </span>
             </div>
           </div>
 
-          <div className="flex-1 text-left">
-            <p className="font-display text-sm font-bold uppercase tracking-wide text-foreground sm:text-lg">
+          <div style={{ flex: 1, textAlign: "left" }}>
+            <p style={{ color: "#ffffff", fontSize: "18px", fontWeight: 800, textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
               {config.match_away_team || "Away"}
             </p>
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="flex items-center gap-3">
-          <div className="h-px flex-1 bg-border" />
-          <span className="font-display text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+        {/* Divider with ticker */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.08)" }} />
+          <span style={{ color: "#ef4444", fontSize: "10px", fontWeight: 700, letterSpacing: "0.3em", fontFamily: "monospace", textTransform: "uppercase" as const }}>
             {liveSymbol}
           </span>
-          <div className="h-px flex-1 bg-border" />
+          <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.08)" }} />
         </div>
 
         {/* Token Stats */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-4">
-          <div className="rounded-lg bg-secondary/60 p-2.5 text-center sm:p-3">
-            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Price</p>
-            <p className="mt-1 font-mono text-sm font-bold text-foreground sm:text-base">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+          <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: "12px", padding: "12px", textAlign: "center", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <p style={{ color: "#666666", fontSize: "9px", fontFamily: "monospace", textTransform: "uppercase" as const, letterSpacing: "0.15em" }}>Price</p>
+            <p style={{ color: "#ffffff", fontSize: "16px", fontWeight: 700, fontFamily: "monospace", marginTop: "4px" }}>
               {livePrice != null ? formatPrice(livePrice) : "—"}
             </p>
             {priceChange24h != null && (
-              <p className={`mt-0.5 flex items-center justify-center gap-0.5 font-mono text-[10px] font-semibold ${priceChange24h >= 0 ? "text-green-500" : "text-destructive"}`}>
-                {priceChange24h >= 0 ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-                {priceChange24h >= 0 ? "+" : ""}{priceChange24h.toFixed(1)}%
+              <p style={{
+                color: priceChange24h >= 0 ? "#22c55e" : "#ef4444",
+                fontSize: "10px",
+                fontWeight: 600,
+                fontFamily: "monospace",
+                marginTop: "2px",
+              }}>
+                {priceChange24h >= 0 ? "▲" : "▼"} {priceChange24h >= 0 ? "+" : ""}{priceChange24h.toFixed(1)}%
               </p>
             )}
           </div>
-          <div className="rounded-lg bg-secondary/60 p-2.5 text-center sm:p-3">
-            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Mcap</p>
-            <p className="mt-1 font-mono text-sm font-bold text-foreground sm:text-base">
+          <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: "12px", padding: "12px", textAlign: "center", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <p style={{ color: "#666666", fontSize: "9px", fontFamily: "monospace", textTransform: "uppercase" as const, letterSpacing: "0.15em" }}>Mcap</p>
+            <p style={{ color: "#ffffff", fontSize: "16px", fontWeight: 700, fontFamily: "monospace", marginTop: "4px" }}>
               {liveMcap != null ? formatMarketCap(liveMcap) : "—"}
             </p>
           </div>
-          <div className="rounded-lg bg-secondary/60 p-2.5 text-center sm:p-3">
-            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Holders</p>
-            <p className="mt-1 font-mono text-sm font-bold text-foreground sm:text-base">
+          <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: "12px", padding: "12px", textAlign: "center", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <p style={{ color: "#666666", fontSize: "9px", fontFamily: "monospace", textTransform: "uppercase" as const, letterSpacing: "0.15em" }}>Holders</p>
+            <p style={{ color: "#ffffff", fontSize: "16px", fontWeight: 700, fontFamily: "monospace", marginTop: "4px" }}>
               {config.holder_count || "—"}
             </p>
           </div>
         </div>
 
-        {/* Branding Footer */}
-        <div className="flex items-center justify-center gap-2 pt-1">
-          <Trophy className="h-3.5 w-3.5 text-primary" />
-          <span className="font-display text-xs font-bold uppercase tracking-[0.2em] text-primary text-glow-red">
-            Til We Win
-          </span>
+        {/* Brand Footer */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "4px" }}>
+          <p style={{ color: "#444444", fontSize: "9px", fontFamily: "monospace" }}>
+            till-we-win.lovable.app
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <Swords style={{ width: 12, height: 12, color: "#ef4444" }} />
+            <span style={{ color: "#ef4444", fontSize: "11px", fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase" as const }}>
+              TIL WE WIN
+            </span>
+          </div>
+          <p style={{ color: "#444444", fontSize: "9px", fontFamily: "monospace" }}>
+            {liveSymbol}
+          </p>
         </div>
       </div>
     </motion.div>
