@@ -22,12 +22,16 @@ export function MatchDayCard({ config }: MatchDayCardProps) {
   const matchDate = config.match_start_time
     ? format(new Date(config.match_start_time), "MMM d, yyyy • h:mm a")
     : config.next_match_date
-      ? format(new Date(config.next_match_date), "MMM d, yyyy")
+      ? format(new Date(config.next_match_date), "MMM d, yyyy • h:mm a")
       : null;
 
   const isMatchLive = config.match_status === "live" || config.match_status === "LIVE";
-  const isUpcoming = config.match_status === "upcoming";
+  const isUpcoming = config.match_status === "upcoming" || config.match_status === "none";
   const isFinished = config.match_status === "finished";
+
+  // Fallback: use opponent + "Arsenal" when match teams aren't populated
+  const homeTeam = config.match_home_team || "Arsenal";
+  const awayTeam = config.match_away_team || config.opponent || "TBD";
 
   const statusLabel = isMatchLive ? "LIVE NOW" : isUpcoming ? "UPCOMING" : isFinished ? "FULL TIME" : "MATCH DAY";
 
@@ -59,15 +63,15 @@ export function MatchDayCard({ config }: MatchDayCardProps) {
 
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({
-          title: `${config.match_home_team} vs ${config.match_away_team} | ${liveSymbol}`,
-          text: `${config.match_home_team} ${config.match_score} ${config.match_away_team}\n${liveSymbol} Price: ${livePrice != null ? formatPrice(livePrice) : "—"}\nMcap: ${liveMcap != null ? formatMarketCap(liveMcap) : "—"}\n\nTIL WE WIN 🔴`,
+          title: `${homeTeam} vs ${awayTeam} | ${liveSymbol}`,
+          text: `${homeTeam} ${config.match_score || "vs"} ${awayTeam}\n${liveSymbol} Price: ${livePrice != null ? formatPrice(livePrice) : "—"}\nMcap: ${liveMcap != null ? formatMarketCap(liveMcap) : "—"}\n\nTIL WE WIN 🔴`,
           url: "https://till-we-win.lovable.app",
           files: [file],
         });
       } else if (navigator.share) {
         await navigator.share({
-          title: `${config.match_home_team} vs ${config.match_away_team} | ${liveSymbol}`,
-          text: `${config.match_home_team} ${config.match_score} ${config.match_away_team}\n${liveSymbol} Price: ${livePrice != null ? formatPrice(livePrice) : "—"}\nMcap: ${liveMcap != null ? formatMarketCap(liveMcap) : "—"}\n\nTIL WE WIN 🔴`,
+          title: `${homeTeam} vs ${awayTeam} | ${liveSymbol}`,
+          text: `${homeTeam} ${config.match_score || "vs"} ${awayTeam}\n${liveSymbol} Price: ${livePrice != null ? formatPrice(livePrice) : "—"}\nMcap: ${liveMcap != null ? formatMarketCap(liveMcap) : "—"}\n\nTIL WE WIN 🔴`,
           url: "https://till-we-win.lovable.app",
         });
       }
@@ -155,9 +159,9 @@ export function MatchDayCard({ config }: MatchDayCardProps) {
 
         {/* League & Date */}
         <div style={{ textAlign: "center" }}>
-          {config.match_league && (
+          {(config.match_league || isUpcoming) && (
             <p style={{ color: "#888888", fontSize: "11px", fontFamily: "monospace", textTransform: "uppercase" as const, letterSpacing: "0.2em", marginBottom: "4px" }}>
-              {config.match_league}
+              {config.match_league || "Premier League"}
             </p>
           )}
           {matchDate && (
@@ -169,7 +173,7 @@ export function MatchDayCard({ config }: MatchDayCardProps) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px" }}>
           <div style={{ flex: 1, textAlign: "right" }}>
             <p style={{ color: "#ffffff", fontSize: "18px", fontWeight: 800, textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
-              {config.match_home_team || "Home"}
+              {homeTeam}
             </p>
           </div>
 
@@ -188,7 +192,7 @@ export function MatchDayCard({ config }: MatchDayCardProps) {
 
           <div style={{ flex: 1, textAlign: "left" }}>
             <p style={{ color: "#ffffff", fontSize: "18px", fontWeight: 800, textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
-              {config.match_away_team || "Away"}
+              {awayTeam}
             </p>
           </div>
         </div>

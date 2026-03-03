@@ -3,6 +3,7 @@ import { PrimaryLivestream } from "@/components/PrimaryLivestream";
 import { TokenInfoCard } from "@/components/TokenInfoCard";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { MissionProgress } from "@/components/MissionProgress";
+import { LiveChat } from "@/components/LiveChat";
 
 const Live = () => {
   const { data: config, isLoading } = useSiteConfig();
@@ -19,16 +20,25 @@ const Live = () => {
 
   return (
     <div className="mx-auto max-w-7xl px-3 sm:px-4 py-6 sm:py-8 space-y-6">
+      {/* Livestream + Chat side-by-side on desktop, stacked on mobile */}
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2">
           <PrimaryLivestream />
-          <MissionProgress config={config} />
         </div>
-        <div className="space-y-6">
-          <CountdownTimer targetDate={config.next_match_date} opponent={config.opponent} />
-          <TokenInfoCard config={config} />
+        <div className="lg:col-span-1">
+          <LiveChat heightClass="h-[300px] sm:h-[400px] lg:h-[480px]" />
         </div>
       </div>
+
+      {/* Countdown + Token Info */}
+      <div className="grid gap-6 md:grid-cols-3">
+        <div className="md:col-span-2">
+          <CountdownTimer targetDate={config.next_match_date} opponent={config.opponent} />
+        </div>
+        <TokenInfoCard config={config} />
+      </div>
+
+      <MissionProgress config={config} />
     </div>
   );
 };
