@@ -7,6 +7,7 @@ const links = [
   { to: "/", label: "MISSION CONTROL" },
   { to: "/mission", label: "MISSION" },
   { to: "/live", label: "LIVE" },
+  { to: "/rewatch", label: "REWATCH" },
   { to: "/community", label: "COMMUNITY" },
 ];
 
