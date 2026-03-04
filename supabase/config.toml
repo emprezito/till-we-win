@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.all-matches]
 verify_jwt = false
+
+[functions.save-recording]
+verify_jwt = false
