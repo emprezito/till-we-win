@@ -1,0 +1,1 @@
+UPDATE site_config SET opponent = '', match_status = 'none', match_home_team = '', match_away_team = '', match_score = '', cached_servers = '[]'::jsonb;

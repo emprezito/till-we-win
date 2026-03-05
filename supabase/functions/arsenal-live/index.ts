@@ -48,11 +48,22 @@ async function fetchMatchesWithRotation(
   throw new Error("All API keys exhausted or failed");
 }
 
+/**
+ * Match only Arsenal FC (England).
+ * Excludes "Arsenal de Sarandí" and other clubs with "arsenal" in their name.
+ */
+function isArsenalFC(teamName: string): boolean {
+  const name = teamName.toLowerCase().trim();
+  // Exact matches or known English Arsenal patterns
+  if (name === "arsenal" || name === "arsenal fc") return true;
+  // Reject anything with extra words after "arsenal" (e.g. "Arsenal de Sarandí")
+  if (name.startsWith("arsenal") && name.length > 10) return false;
+  return name === "arsenal";
+}
+
 function findArsenalMatch(matches: any[]) {
   return matches.find((m: any) => {
-    const home = (m.home_team_name || "").toLowerCase();
-    const away = (m.away_team_name || "").toLowerCase();
-    return home.includes("arsenal") || away.includes("arsenal");
+    return isArsenalFC(m.home_team_name || "") || isArsenalFC(m.away_team_name || "");
   });
 }
 
@@ -65,8 +76,7 @@ function getStreamUrl(match: any): string | null {
 }
 
 function getOpponent(match: any): string {
-  const home = (match.home_team_name || "").toLowerCase();
-  if (home.includes("arsenal")) return match.away_team_name || "Unknown";
+  if (isArsenalFC(match.home_team_name || "")) return match.away_team_name || "Unknown";
   return match.home_team_name || "Unknown";
 }
 
@@ -128,12 +138,21 @@ Deno.serve(async (req) => {
     const now = Date.now();
     const nextMatch = config.next_match_date ? new Date(config.next_match_date).getTime() : null;
     const hoursBefore = nextMatch ? (nextMatch - now) / (1000 * 60 * 60) : null;
+    // Also check hours AFTER match start (match could be ongoing up to ~3h after start)
+    const hoursAfter = nextMatch ? (now - nextMatch) / (1000 * 60 * 60) : null;
 
-    // If no match scheduled or match is more than 2 hours away, skip API call
-    // Exception: if currently marked as live, always check
-    if (!config.is_live && (hoursBefore === null || hoursBefore > 2)) {
+    // Skip API call only if:
+    // - Not currently live AND
+    // - Match is >2h in the future OR >4h in the past (match definitely over)
+    // - If next_match_date is null, still poll once every call (no gate)
+    const matchWindowActive = nextMatch !== null && (
+      (hoursBefore !== null && hoursBefore <= 2) || 
+      (hoursAfter !== null && hoursAfter <= 4)
+    );
+
+    if (!config.is_live && nextMatch !== null && !matchWindowActive) {
       return new Response(
-        JSON.stringify({ live: false, source: "cached_skip", message: "No match within 2 hours" }),
+        JSON.stringify({ live: false, source: "cached_skip", message: "No match within window" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
