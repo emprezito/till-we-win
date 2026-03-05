@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 // fixturedownload.com has up-to-date EPL fixtures including 2025-26
+// Try current season first; fixturedownload uses the starting-year of the season
 const FIXTURE_URL = "https://fixturedownload.com/feed/json/epl-2025/arsenal";
 
 Deno.serve(async (req) => {
