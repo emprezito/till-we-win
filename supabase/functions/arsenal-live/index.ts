@@ -9,12 +9,10 @@ const corsHeaders = {
 // --- Key Rotation ---
 function getApiKeys(): string[] {
   const keys: string[] = [];
-  // Try numbered keys first
   for (let i = 1; i <= 5; i++) {
     const key = Deno.env.get(`RAPIDAPI_KEY_${i}`);
     if (key) keys.push(key);
   }
-  // Fallback to single key
   const singleKey = Deno.env.get("RAPIDAPI_KEY");
   if (singleKey && !keys.includes(singleKey)) keys.push(singleKey);
   return keys;
@@ -34,7 +32,6 @@ async function fetchMatchesWithRotation(
         headers: { "X-RapidAPI-Key": keys[i], "X-RapidAPI-Host": host },
       });
       const data = await res.json();
-      // Check for quota error
       if (data?.message && typeof data.message === "string" && data.message.includes("exceeded")) {
         console.warn(`Key ${i + 1} quota exceeded, trying next...`);
         continue;
@@ -54,9 +51,7 @@ async function fetchMatchesWithRotation(
  */
 function isArsenalFC(teamName: string): boolean {
   const name = teamName.toLowerCase().trim();
-  // Exact matches or known English Arsenal patterns
   if (name === "arsenal" || name === "arsenal fc") return true;
-  // Reject anything with extra words after "arsenal" (e.g. "Arsenal de Sarandí")
   if (name.startsWith("arsenal") && name.length > 10) return false;
   return name === "arsenal";
 }
@@ -102,7 +97,7 @@ Deno.serve(async (req) => {
 
     const { data: config } = await supabase
       .from("site_config")
-      .select("id, is_live, manual_override_stream_url, enable_auto_stream, opponent, next_match_date")
+      .select("id, is_live, manual_override_stream_url, enable_auto_stream, opponent, next_match_date, match_status")
       .single();
 
     if (!config) {
@@ -112,7 +107,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // If manual override is set, use it
+    // --- Manual override always takes priority ---
     if (config.manual_override_stream_url) {
       await supabase.from("site_config").update({
         match_status: "live",
@@ -126,7 +121,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // If auto stream is disabled, return current DB state
+    // --- If auto stream disabled, return cached state ---
     if (!config.enable_auto_stream) {
       return new Response(
         JSON.stringify({ live: config.is_live || false, opponent: config.opponent || "TBD", source: "manual" }),
@@ -134,10 +129,39 @@ Deno.serve(async (req) => {
       );
     }
 
-    // No time gate — Arsenal plays in EPL, FA Cup, Champions League, League Cup, etc.
-    // The cron schedule itself controls call frequency. Always check the API.
+    // =========================================================
+    // SMART TIME GATE: Only call RapidAPI during match windows
+    // - 30 min before kickoff → 4 hours after kickoff
+    // - If currently marked live, always check (to detect match end)
+    // - Outside window: return cached data, zero API calls
+    // =========================================================
+    const now = Date.now();
+    const nextMatch = config.next_match_date ? new Date(config.next_match_date).getTime() : null;
 
-    // --- Check LIVE Arsenal match ---
+    if (nextMatch) {
+      const minsBefore = (nextMatch - now) / (1000 * 60);
+      const hoursAfter = (now - nextMatch) / (1000 * 60 * 60);
+
+      const inMatchWindow = minsBefore <= 30 || (hoursAfter >= 0 && hoursAfter <= 4);
+
+      if (!config.is_live && !inMatchWindow) {
+        // Outside match window — no API calls, just return cached state
+        console.log(`Outside match window. Next match in ${Math.round(minsBefore)} min. Skipping API calls.`);
+        return new Response(
+          JSON.stringify({
+            live: false,
+            source: "cached_skip",
+            message: `Next match in ${Math.round(minsBefore / 60)} hours. Polling starts 30 min before kickoff.`,
+            next_match_date: config.next_match_date,
+            opponent: config.opponent || "TBD",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+    // If next_match_date is null, we still check (fetch-arsenal-fixtures sets this)
+
+    // --- MATCH WINDOW ACTIVE: Check LIVE first (1 API call) ---
     let arsenalMatch = null;
     try {
       const { data: liveData } = await fetchMatchesWithRotation(apiKeys, rapidApiHost, { status: "live", page: "1" });
@@ -177,83 +201,65 @@ Deno.serve(async (req) => {
       );
     }
 
-    // --- Check UPCOMING ---
-    try {
-      const { data: upcomingData } = await fetchMatchesWithRotation(apiKeys, rapidApiHost, { status: "vs", page: "1" });
-      const upcomingArsenal = findArsenalMatch(upcomingData?.matches || []);
+    // --- Not live. Check FINISHED (1 more API call) to detect match end ---
+    // Only check finished if we were previously live or in post-match window
+    if (config.is_live || (nextMatch && (now - nextMatch) / (1000 * 60 * 60) >= 1.5)) {
+      try {
+        const { data: finishedData } = await fetchMatchesWithRotation(apiKeys, rapidApiHost, { status: "finished", page: "1" });
+        const finishedArsenal = findArsenalMatch(finishedData?.matches || []);
 
-      if (upcomingArsenal) {
-        const opponent = getOpponent(upcomingArsenal);
-        const startTime = upcomingArsenal.match_time
-          ? new Date(Number(upcomingArsenal.match_time) * 1000).toISOString()
-          : null;
+        if (finishedArsenal) {
+          const opponent = getOpponent(finishedArsenal);
+          const score = `${finishedArsenal.homeTeamScore ?? "0"}-${finishedArsenal.awayTeamScore ?? "0"}`;
 
-        await supabase.from("site_config").update({
-          is_live: false,
-          match_status: "upcoming",
-          match_home_team: upcomingArsenal.home_team_name || "",
-          match_away_team: upcomingArsenal.away_team_name || "",
-          match_score: "",
-          match_league: upcomingArsenal.league_name || "",
-          match_start_time: startTime,
-          // Update next_match_date from ANY competition (not just EPL)
-          next_match_date: startTime,
-          cached_servers: [],
-          opponent,
-        }).eq("id", config.id);
+          await supabase.from("site_config").update({
+            is_live: false,
+            match_status: "finished",
+            match_home_team: finishedArsenal.home_team_name || "",
+            match_away_team: finishedArsenal.away_team_name || "",
+            match_score: score,
+            match_league: finishedArsenal.league_name || "",
+            cached_servers: [],
+            opponent,
+          }).eq("id", config.id);
 
-        return new Response(
-          JSON.stringify({
-            live: false, upcoming: true, homeTeam: upcomingArsenal.home_team_name,
-            awayTeam: upcomingArsenal.away_team_name, league: upcomingArsenal.league_name,
-            startTime, opponent, source: "api_upcoming",
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+          return new Response(
+            JSON.stringify({
+              live: false, finished: true, homeTeam: finishedArsenal.home_team_name,
+              awayTeam: finishedArsenal.away_team_name, score, league: finishedArsenal.league_name,
+              opponent, source: "api_finished",
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch (err) {
+        console.warn("Finished check failed:", err);
       }
-    } catch (err) {
-      console.warn("Upcoming check failed:", err);
     }
 
-    // --- Check FINISHED ---
-    try {
-      const { data: finishedData } = await fetchMatchesWithRotation(apiKeys, rapidApiHost, { status: "finished", page: "1" });
-      const finishedArsenal = findArsenalMatch(finishedData?.matches || []);
-
-      if (finishedArsenal) {
-        const opponent = getOpponent(finishedArsenal);
-        const score = `${finishedArsenal.homeTeamScore ?? "0"}-${finishedArsenal.awayTeamScore ?? "0"}`;
-
-        await supabase.from("site_config").update({
-          is_live: false,
-          match_status: "finished",
-          match_home_team: finishedArsenal.home_team_name || "",
-          match_away_team: finishedArsenal.away_team_name || "",
-          match_score: score,
-          match_league: finishedArsenal.league_name || "",
-          cached_servers: [],
-          opponent,
-        }).eq("id", config.id);
-
-        return new Response(
-          JSON.stringify({
-            live: false, finished: true, homeTeam: finishedArsenal.home_team_name,
-            awayTeam: finishedArsenal.away_team_name, score, league: finishedArsenal.league_name,
-            opponent, source: "api_finished",
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    } catch (err) {
-      console.warn("Finished check failed:", err);
+    // --- Pre-match window (30 min before, not yet live) — just confirm upcoming ---
+    // No need for extra API call, we already know it's upcoming from next_match_date
+    if (nextMatch && (nextMatch - now) > 0) {
+      return new Response(
+        JSON.stringify({
+          live: false, upcoming: true,
+          next_match_date: config.next_match_date,
+          opponent: config.opponent || "TBD",
+          source: "pre_match_window",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // --- No match found ---
-    await supabase.from("site_config").update({
-      is_live: false,
-      match_status: "none",
-      cached_servers: [],
-    }).eq("id", config.id);
+    // --- No match context ---
+    if (config.is_live) {
+      // Was live but can't find match anymore — mark as finished
+      await supabase.from("site_config").update({
+        is_live: false,
+        match_status: "finished",
+        cached_servers: [],
+      }).eq("id", config.id);
+    }
 
     return new Response(
       JSON.stringify({ live: false, upcoming: false, finished: false, source: "api_none" }),
