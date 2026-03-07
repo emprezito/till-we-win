@@ -196,6 +196,8 @@ Deno.serve(async (req) => {
           match_score: "",
           match_league: upcomingArsenal.league_name || "",
           match_start_time: startTime,
+          // Update next_match_date from ANY competition (not just EPL)
+          next_match_date: startTime,
           cached_servers: [],
           opponent,
         }).eq("id", config.id);
