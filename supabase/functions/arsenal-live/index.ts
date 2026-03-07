@@ -134,28 +134,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // --- Smart polling: Only call API if we're near match time ---
-    const now = Date.now();
-    const nextMatch = config.next_match_date ? new Date(config.next_match_date).getTime() : null;
-    const hoursBefore = nextMatch ? (nextMatch - now) / (1000 * 60 * 60) : null;
-    // Also check hours AFTER match start (match could be ongoing up to ~3h after start)
-    const hoursAfter = nextMatch ? (now - nextMatch) / (1000 * 60 * 60) : null;
-
-    // Skip API call only if:
-    // - Not currently live AND
-    // - Match is >2h in the future OR >4h in the past (match definitely over)
-    // - If next_match_date is null, still poll once every call (no gate)
-    const matchWindowActive = nextMatch !== null && (
-      (hoursBefore !== null && hoursBefore <= 2) || 
-      (hoursAfter !== null && hoursAfter <= 4)
-    );
-
-    if (!config.is_live && nextMatch !== null && !matchWindowActive) {
-      return new Response(
-        JSON.stringify({ live: false, source: "cached_skip", message: "No match within window" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // No time gate — Arsenal plays in EPL, FA Cup, Champions League, League Cup, etc.
+    // The cron schedule itself controls call frequency. Always check the API.
 
     // --- Check LIVE Arsenal match ---
     let arsenalMatch = null;
@@ -216,6 +196,8 @@ Deno.serve(async (req) => {
           match_score: "",
           match_league: upcomingArsenal.league_name || "",
           match_start_time: startTime,
+          // Update next_match_date from ANY competition (not just EPL)
+          next_match_date: startTime,
           cached_servers: [],
           opponent,
         }).eq("id", config.id);
