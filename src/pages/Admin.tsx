@@ -110,6 +110,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       </div>
 
       <ConfigSection config={config} queryClient={queryClient} toast={toast} />
+      <ApiUsageStats />
       <SlidesSection slides={slides || []} queryClient={queryClient} toast={toast} />
     </div>
   );
