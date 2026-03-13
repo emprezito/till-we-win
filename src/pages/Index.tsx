@@ -80,6 +80,9 @@ const Index = () => {
         <TokenInfoCard config={config} />
       </div>
 
+      {/* 7-Day Arsenal Fixtures */}
+      <UpcomingFixtures />
+
       {/* Match Day Card - Shareable */}
       <MatchDayCard config={config} />
 
