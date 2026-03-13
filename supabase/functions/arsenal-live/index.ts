@@ -129,6 +129,22 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Helper to log API usage
+    async function logApiUsage(endpoint: string, keyIndex: number, status: string, skipped = false, skipReason?: string) {
+      try {
+        await supabase.from("api_usage_logs").insert({
+          function_name: "arsenal-live",
+          endpoint,
+          key_index: keyIndex,
+          status,
+          skipped,
+          skip_reason: skipReason || null,
+        });
+      } catch (e) {
+        console.warn("Failed to log API usage:", e);
+      }
+    }
+
     // =========================================================
     // SMART TIME GATE: Only call RapidAPI during match windows
     // - 30 min before kickoff → 4 hours after kickoff
@@ -145,8 +161,8 @@ Deno.serve(async (req) => {
       const inMatchWindow = minsBefore <= 30 || (hoursAfter >= 0 && hoursAfter <= 4);
 
       if (!config.is_live && !inMatchWindow) {
-        // Outside match window — no API calls, just return cached state
         console.log(`Outside match window. Next match in ${Math.round(minsBefore)} min. Skipping API calls.`);
+        await logApiUsage("skipped", 0, "skipped", true, `Next match in ${Math.round(minsBefore)} min`);
         return new Response(
           JSON.stringify({
             live: false,
