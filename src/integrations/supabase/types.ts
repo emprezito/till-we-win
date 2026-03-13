@@ -145,6 +145,7 @@ export type Database = {
           ticker: string
           token_name: string
           twitter_link: string
+          upcoming_fixtures: Json
           updated_at: string
         }
         Insert: {
@@ -175,6 +176,7 @@ export type Database = {
           ticker?: string
           token_name?: string
           twitter_link?: string
+          upcoming_fixtures?: Json
           updated_at?: string
         }
         Update: {
@@ -205,6 +207,7 @@ export type Database = {
           ticker?: string
           token_name?: string
           twitter_link?: string
+          upcoming_fixtures?: Json
           updated_at?: string
         }
         Relationships: []
