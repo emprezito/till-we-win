@@ -223,7 +223,8 @@ Deno.serve(async (req) => {
     // Only check finished if we were previously live or in post-match window
     if (config.is_live || (nextMatch && (now - nextMatch) / (1000 * 60 * 60) >= 1.5)) {
       try {
-        const { data: finishedData } = await fetchMatchesWithRotation(apiKeys, rapidApiHost, { status: "finished", page: "1" });
+        const { data: finishedData, usedKeyIndex } = await fetchMatchesWithRotation(apiKeys, rapidApiHost, { status: "finished", page: "1" });
+        await logApiUsage("matches?status=finished", usedKeyIndex, "success");
         const finishedArsenal = findArsenalMatch(finishedData?.matches || []);
 
         if (finishedArsenal) {
