@@ -92,6 +92,7 @@ Deno.serve(async (req) => {
           console.warn("RapidAPI quota exceeded for fixture check, skipping");
           await logApiUsage("matches?status=vs", 0, "quota_exceeded", true, "Quota exceeded");
         } else {
+          await logApiUsage("matches?status=vs", 0, "success");
           const allMatches = data?.matches || [];
           const arsenalMatch = allMatches.find((m: any) =>
             isArsenalFC(m.home_team_name || "") || isArsenalFC(m.away_team_name || "")
