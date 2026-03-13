@@ -1,0 +1,1 @@
+ALTER TABLE public.site_config ADD COLUMN IF NOT EXISTS upcoming_fixtures jsonb NOT NULL DEFAULT '[]'::jsonb;
