@@ -28,7 +28,8 @@ Deno.serve(async (req) => {
     );
 
     const now = new Date();
-    const candidates: { date: string; opponent: string; league: string }[] = [];
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const candidates: { date: string; opponent: string; league: string; home: string; away: string; status: string }[] = [];
 
     // Helper to log API usage
     async function logApiUsage(endpoint: string, keyIndex: number, status: string, skipped = false, skipReason?: string) {
@@ -55,15 +56,25 @@ Deno.serve(async (req) => {
         const matches = await res.json();
         for (const match of matches) {
           const matchDate = new Date(match.DateUtc);
-          if (matchDate <= now) continue;
+          // Include matches from now up to 7 days ahead, AND recently finished (last 24h)
+          const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          if (matchDate > sevenDaysFromNow) continue;
+          if (matchDate < oneDayAgo) continue;
+
+          const dateStr = match.DateUtc.replace(" ", "T").replace(/Z$/, "") + "Z";
+          const isUpcoming = matchDate > now;
           const opponent = match.HomeTeam === "Arsenal" ? match.AwayTeam : match.HomeTeam;
+
           candidates.push({
-            date: match.DateUtc.replace(" ", "T").replace(/Z$/, "") + "Z",
+            date: dateStr,
             opponent,
             league: "Premier League",
+            home: match.HomeTeam,
+            away: match.AwayTeam,
+            status: isUpcoming ? "upcoming" : "finished",
           });
         }
-        console.log(`EPL: Found ${candidates.length} upcoming matches`);
+        console.log(`EPL: Found ${candidates.length} matches in 7-day window`);
       }
     } catch (err) {
       console.warn("EPL fixture fetch failed:", err);
@@ -71,7 +82,6 @@ Deno.serve(async (req) => {
 
     // ==========================================
     // SOURCE 2: RapidAPI upcoming (ALL competitions)
-    // Uses only 1 API call to cover FA Cup, CL, League Cup, etc.
     // ==========================================
     try {
       const rapidApiKey = Deno.env.get("RAPIDAPI_KEY_1") || Deno.env.get("RAPIDAPI_KEY");
@@ -87,18 +97,17 @@ Deno.serve(async (req) => {
         });
         const data = await res.json();
 
-        // Check for quota error
         if (data?.message && typeof data.message === "string" && data.message.includes("exceeded")) {
           console.warn("RapidAPI quota exceeded for fixture check, skipping");
           await logApiUsage("matches?status=vs", 0, "quota_exceeded", true, "Quota exceeded");
         } else {
           await logApiUsage("matches?status=vs", 0, "success");
           const allMatches = data?.matches || [];
-          const arsenalMatch = allMatches.find((m: any) =>
+          const arsenalMatches = allMatches.filter((m: any) =>
             isArsenalFC(m.home_team_name || "") || isArsenalFC(m.away_team_name || "")
           );
 
-          if (arsenalMatch) {
+          for (const arsenalMatch of arsenalMatches) {
             const opponent = isArsenalFC(arsenalMatch.home_team_name || "")
               ? arsenalMatch.away_team_name || "Unknown"
               : arsenalMatch.home_team_name || "Unknown";
@@ -106,13 +115,27 @@ Deno.serve(async (req) => {
               ? new Date(Number(arsenalMatch.match_time) * 1000).toISOString()
               : null;
 
-            if (startTime && new Date(startTime) > now) {
-              candidates.push({
-                date: startTime,
-                opponent,
-                league: arsenalMatch.league_name || "Cup",
-              });
-              console.log(`RapidAPI: Found upcoming ${arsenalMatch.league_name} match vs ${opponent} at ${startTime}`);
+            if (startTime) {
+              const matchDate = new Date(startTime);
+              if (matchDate <= sevenDaysFromNow) {
+                // Check if this fixture already exists (dedup by date proximity)
+                const isDuplicate = candidates.some(c => {
+                  const diff = Math.abs(new Date(c.date).getTime() - matchDate.getTime());
+                  return diff < 3 * 60 * 60 * 1000 && c.opponent.toLowerCase() === opponent.toLowerCase();
+                });
+
+                if (!isDuplicate) {
+                  candidates.push({
+                    date: startTime,
+                    opponent,
+                    league: arsenalMatch.league_name || "Cup",
+                    home: arsenalMatch.home_team_name || "Arsenal",
+                    away: arsenalMatch.away_team_name || "Unknown",
+                    status: matchDate > now ? "upcoming" : "finished",
+                  });
+                  console.log(`RapidAPI: Found ${arsenalMatch.league_name} match vs ${opponent} at ${startTime}`);
+                }
+              }
             }
           }
         }
@@ -121,40 +144,37 @@ Deno.serve(async (req) => {
       console.warn("RapidAPI upcoming check failed:", err);
     }
 
-    // ==========================================
-    // Pick the EARLIEST upcoming match across all sources
-    // ==========================================
-    if (candidates.length === 0) {
-      return new Response(
-        JSON.stringify({ message: "No upcoming Arsenal matches found" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
+    // Sort by date
     candidates.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const nextMatch = candidates[0];
 
-    // Update site_config with the earliest match
+    // Pick the earliest upcoming match for the countdown
+    const nextUpcoming = candidates.find(c => c.status === "upcoming");
+
+    // Update site_config
     const { data: configs } = await supabase
       .from("site_config")
       .select("id")
       .limit(1);
 
     if (configs && configs.length > 0) {
+      const updatePayload: any = {
+        upcoming_fixtures: candidates,
+      };
+      if (nextUpcoming) {
+        updatePayload.next_match_date = nextUpcoming.date;
+        updatePayload.opponent = nextUpcoming.opponent;
+      }
       await supabase
         .from("site_config")
-        .update({
-          next_match_date: nextMatch.date,
-          opponent: nextMatch.opponent,
-        })
+        .update(updatePayload)
         .eq("id", configs[0].id);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        nextMatch,
-        allUpcoming: candidates.slice(0, 5), // Return next 5 for visibility
+        fixtures: candidates,
+        nextMatch: nextUpcoming || null,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
