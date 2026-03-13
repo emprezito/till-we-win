@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_usage_logs: {
+        Row: {
+          created_at: string
+          endpoint: string
+          function_name: string
+          id: string
+          key_index: number
+          skip_reason: string | null
+          skipped: boolean
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint?: string
+          function_name?: string
+          id?: string
+          key_index?: number
+          skip_reason?: string | null
+          skipped?: boolean
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          function_name?: string
+          id?: string
+          key_index?: number
+          skip_reason?: string | null
+          skipped?: boolean
+          status?: string
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           created_at: string

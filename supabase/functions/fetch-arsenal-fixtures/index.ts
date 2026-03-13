@@ -30,6 +30,22 @@ Deno.serve(async (req) => {
     const now = new Date();
     const candidates: { date: string; opponent: string; league: string }[] = [];
 
+    // Helper to log API usage
+    async function logApiUsage(endpoint: string, keyIndex: number, status: string, skipped = false, skipReason?: string) {
+      try {
+        await supabase.from("api_usage_logs").insert({
+          function_name: "fetch-arsenal-fixtures",
+          endpoint,
+          key_index: keyIndex,
+          status,
+          skipped,
+          skip_reason: skipReason || null,
+        });
+      } catch (e) {
+        console.warn("Failed to log API usage:", e);
+      }
+    }
+
     // ==========================================
     // SOURCE 1: EPL fixtures (free, no API key)
     // ==========================================
@@ -74,7 +90,9 @@ Deno.serve(async (req) => {
         // Check for quota error
         if (data?.message && typeof data.message === "string" && data.message.includes("exceeded")) {
           console.warn("RapidAPI quota exceeded for fixture check, skipping");
+          await logApiUsage("matches?status=vs", 0, "quota_exceeded", true, "Quota exceeded");
         } else {
+          await logApiUsage("matches?status=vs", 0, "success");
           const allMatches = data?.matches || [];
           const arsenalMatch = allMatches.find((m: any) =>
             isArsenalFC(m.home_team_name || "") || isArsenalFC(m.away_team_name || "")

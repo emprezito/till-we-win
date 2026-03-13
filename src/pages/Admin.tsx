@@ -83,7 +83,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useSlides } from "@/hooks/useSlides";
 import { Trash2, Plus, GripVertical } from "lucide-react";
-
+import ApiUsageStats from "@/components/ApiUsageStats";
 function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const { data: config, isLoading } = useSiteConfig();
   const { data: slides } = useSlides();
@@ -110,6 +110,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       </div>
 
       <ConfigSection config={config} queryClient={queryClient} toast={toast} />
+      <ApiUsageStats />
       <SlidesSection slides={slides || []} queryClient={queryClient} toast={toast} />
     </div>
   );
