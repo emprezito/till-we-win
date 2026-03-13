@@ -9,6 +9,7 @@ import { MissionProgress } from "@/components/MissionProgress";
 import { SlidesViewer } from "@/components/SlidesViewer";
 import { SocialLinks } from "@/components/SocialLinks";
 import { MatchDayCard } from "@/components/MatchDayCard";
+import { UpcomingFixtures } from "@/components/UpcomingFixtures";
 
 const Index = () => {
   const { data: config, isLoading } = useSiteConfig();
