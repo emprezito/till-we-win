@@ -180,10 +180,12 @@ Deno.serve(async (req) => {
     // --- MATCH WINDOW ACTIVE: Check LIVE first (1 API call) ---
     let arsenalMatch = null;
     try {
-      const { data: liveData } = await fetchMatchesWithRotation(apiKeys, rapidApiHost, { status: "live", page: "1" });
+      const { data: liveData, usedKeyIndex } = await fetchMatchesWithRotation(apiKeys, rapidApiHost, { status: "live", page: "1" });
       arsenalMatch = findArsenalMatch(liveData?.matches || []);
+      await logApiUsage("matches?status=live", usedKeyIndex, "success");
     } catch (err) {
       console.error("All keys failed for live check:", err);
+      await logApiUsage("matches?status=live", -1, "all_keys_failed");
       return new Response(
         JSON.stringify({ live: false, error: String(err), source: "api_error" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
