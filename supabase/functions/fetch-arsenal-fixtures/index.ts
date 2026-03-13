@@ -90,6 +90,7 @@ Deno.serve(async (req) => {
         // Check for quota error
         if (data?.message && typeof data.message === "string" && data.message.includes("exceeded")) {
           console.warn("RapidAPI quota exceeded for fixture check, skipping");
+          await logApiUsage("matches?status=vs", 0, "quota_exceeded", true, "Quota exceeded");
         } else {
           const allMatches = data?.matches || [];
           const arsenalMatch = allMatches.find((m: any) =>
